@@ -1,0 +1,4 @@
+package-lock.json
+CHANGELOG.md
+.idea
+.github/workflows/hexlet-check.yml
