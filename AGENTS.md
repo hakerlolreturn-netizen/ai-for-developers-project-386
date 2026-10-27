@@ -28,3 +28,17 @@ Every commit message follows [Conventional Commits](https://www.conventionalcomm
 - Summary in English, imperative mood, lowercase, no trailing period.
 
 release-please builds `CHANGELOG.md` and the version from these messages; do not edit them by hand.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for `hakerlolreturn-netizen/ai-for-developers-project-386` (`gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
