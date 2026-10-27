@@ -1,6 +1,5 @@
 # Календарь звонков
 
-
 [![hexlet-check](https://github.com/hakerlolreturn-netizen/ai-for-developers-project-386/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/hakerlolreturn-netizen/ai-for-developers-project-386/actions)
 
 Разработайте совместно с ИИ сервис для бронирования календаря
@@ -10,20 +9,28 @@
 
 ## Стек
 
-- Разное
+- Backend: Node.js, Fastify, TypeScript
+- Frontend: Vite, React, Mantine
+- Тесты: Vitest; линтер: oxlint, Prettier
+- CI: GitHub Actions; релизы: release-please
 
 ## Установка
 
-<!-- Опишите установку: клонирование, зависимости, переменные окружения -->
+Нужен Node.js 24+ (версия в `.nvmrc`).
 
 ```bash
 git clone https://github.com/hakerlolreturn-netizen/ai-for-developers-project-386.git
 cd ai-for-developers-project-386
+npm ci
 ```
 
 ## Использование
 
-<!-- Добавьте примеры запуска и запись asciinema — именно это смотрит работодатель -->
+```bash
+npm run dev    # бекенд http://localhost:3000, фронтенд http://localhost:5173
+npm test       # тесты
+npm run lint   # линтер и проверка форматирования
+```
 
 ---
 
