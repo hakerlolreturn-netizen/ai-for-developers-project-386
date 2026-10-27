@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -28,10 +28,23 @@ describe('главная страница', () => {
     expect(screen.getByText('Оставьте имя и email')).toBeTruthy()
   })
 
+  it('описывает возможности сервиса', () => {
+    renderAt('/')
+
+    expect(screen.getByRole('heading', { name: 'Возможности' })).toBeTruthy()
+    expect(screen.getByText('Выбор типа встречи и удобного времени для звонка.')).toBeTruthy()
+    expect(screen.getByText('Запись без регистрации: достаточно имени и email.')).toBeTruthy()
+    expect(
+      screen.getByText('Владелец заводит типы встреч и видит все предстоящие встречи.'),
+    ).toBeTruthy()
+  })
+
   it('кнопка «Записаться» ведёт на страницу записи', async () => {
     renderAt('/')
 
-    await userEvent.click(screen.getByRole('link', { name: 'Записаться' }))
+    await userEvent.click(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Записаться' }),
+    )
 
     expect(screen.getByRole('heading', { level: 1, name: 'Запись на звонок' })).toBeTruthy()
     expect(screen.getByText('Скоро здесь можно будет выбрать тип встречи и слот')).toBeTruthy()
@@ -42,6 +55,34 @@ describe('главная страница', () => {
 
     await userEvent.click(screen.getByRole('link', { name: 'На главную' }))
 
-    expect(screen.getByRole('link', { name: 'Записаться' })).toBeTruthy()
+    expect(screen.getByText('Выберите тип встречи')).toBeTruthy()
+  })
+})
+
+describe('панель сверху', () => {
+  it('показывает название сервиса', () => {
+    renderAt('/')
+
+    expect(within(screen.getByRole('banner')).getByText('Calendar')).toBeTruthy()
+  })
+
+  it('«Записаться» ведёт на страницу записи', async () => {
+    renderAt('/')
+
+    await userEvent.click(
+      within(screen.getByRole('banner')).getByRole('link', { name: 'Записаться' }),
+    )
+
+    expect(screen.getByText('Скоро здесь можно будет выбрать тип встречи и слот')).toBeTruthy()
+  })
+
+  it('«Предстоящие встречи» ведёт на страницу предстоящих встреч', async () => {
+    renderAt('/')
+
+    await userEvent.click(
+      within(screen.getByRole('banner')).getByRole('link', { name: 'Предстоящие встречи' }),
+    )
+
+    expect(screen.getByText('Скоро здесь появится список предстоящих встреч')).toBeTruthy()
   })
 })
