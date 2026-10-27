@@ -22,6 +22,7 @@ describe('главная страница', () => {
     renderAt('/')
 
     expect(screen.getByRole('heading', { level: 1, name: 'Запись на звонок' })).toBeTruthy()
+    expect(screen.getByText(/Выберите удобное время для звонка/)).toBeTruthy()
     expect(screen.getByText('Выберите тип встречи')).toBeTruthy()
     expect(screen.getByText('Выберите свободный слот')).toBeTruthy()
     expect(screen.getByText('Оставьте имя и email')).toBeTruthy()
@@ -32,6 +33,15 @@ describe('главная страница', () => {
 
     await userEvent.click(screen.getByRole('link', { name: 'Записаться' }))
 
+    expect(screen.getByRole('heading', { level: 1, name: 'Запись на звонок' })).toBeTruthy()
     expect(screen.getByText('Скоро здесь можно будет выбрать тип встречи и слот')).toBeTruthy()
+  })
+
+  it('со страницы записи можно вернуться на главную', async () => {
+    renderAt('/book')
+
+    await userEvent.click(screen.getByRole('link', { name: 'На главную' }))
+
+    expect(screen.getByRole('link', { name: 'Записаться' })).toBeTruthy()
   })
 })
