@@ -1,15 +1,26 @@
-import { Anchor, Container, Text, Title } from '@mantine/core'
-import { Link } from 'react-router'
+// PROTOTYPE: три варианта потока гостя на /book, переключаются через ?variant=A|B|C.
+import { useSearchParams } from 'react-router'
+import { PrototypeSwitcher } from '../components/PrototypeSwitcher.tsx'
+import * as A from './book-prototype/VariantA.tsx'
+import * as B from './book-prototype/VariantB.tsx'
+import * as C from './book-prototype/VariantC.tsx'
+
+const variants = [
+  { key: 'A', name: A.name },
+  { key: 'B', name: B.name },
+  { key: 'C', name: C.name },
+]
 
 function BookPage() {
+  const [params] = useSearchParams()
+  const variant = params.get('variant') ?? 'A'
   return (
-    <Container size="sm" py="xl">
-      <Title order={1}>Запись на звонок</Title>
-      <Text mt="md">Скоро здесь можно будет выбрать тип встречи и слот</Text>
-      <Anchor component={Link} to="/" mt="md" display="inline-block">
-        На главную
-      </Anchor>
-    </Container>
+    <>
+      {variant === 'A' && <A.VariantA key="A" />}
+      {variant === 'B' && <B.VariantB key="B" />}
+      {variant === 'C' && <C.VariantC key="C" />}
+      <PrototypeSwitcher variants={variants} current={variant} />
+    </>
   )
 }
 
