@@ -79,6 +79,40 @@ model Slot {
   end: utcDateTime;
 }
 
+model CreateMeeting {
+  meetingTypeId: string;
+  start: utcDateTime;
+
+  @pattern("\\S")
+  @maxLength(100)
+  guestName: string;
+
+  @format("email")
+  guestEmail: string;
+}
+
+model MeetingTypeSummary {
+  id: string;
+  name: string;
+  durationMinutes: 15 | 30 | 45 | 60;
+}
+
+model Meeting {
+  id: string;
+  meetingType: MeetingTypeSummary;
+  start: utcDateTime;
+  end: utcDateTime;
+  guestName: string;
+  guestEmail: string;
+}
+
+@error
+model SlotUnavailable {
+  @statusCode _: 422;
+  code: "slot_unavailable";
+  message: string;
+}
+
 @route("/api/meeting-types")
 @tag("meeting-types")
 interface MeetingTypesApi {
@@ -98,4 +132,14 @@ interface MeetingTypesApi {
     @statusCode _: 201;
     @body body: MeetingType;
   } | ValidationError | MeetingTypeIdTaken;
+}
+
+@route("/api/meetings")
+@tag("meetings")
+interface MeetingsApi {
+  @post
+  createMeeting(@body body: CreateMeeting): {
+    @statusCode _: 201;
+    @body body: Meeting;
+  } | ValidationError | MeetingTypeNotFound | SlotUnavailable;
 }
