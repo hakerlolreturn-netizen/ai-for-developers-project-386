@@ -1,11 +1,13 @@
 import Fastify, { type FastifyServerOptions } from 'fastify'
 import type { components } from '../../api/dist/schema.d.ts'
 import { loadContract } from './contract.ts'
+import { formatOwnerTime, freeSlots } from './slots.ts'
 import { createStore } from './store.ts'
 
 type Owner = components['schemas']['Owner']
 type ApiError = components['schemas']['ApiError']
 type MeetingType = components['schemas']['MeetingType']
+type Slot = components['schemas']['Slot']
 type CreateMeetingType = components['schemas']['CreateMeetingType']
 
 const VALIDATION_MESSAGES: Record<string, string> = {
@@ -95,6 +97,28 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
           .send({ code: 'meeting_type_not_found', message: 'Тип встречи не найден' })
       }
       return meetingType
+    },
+  )
+
+  app.get<{ Params: { id: string } }>(
+    '/api/meeting-types/:id/slots',
+    { schema: contract.routeSchema('MeetingTypesApi_listSlots') },
+    async (request, reply): Promise<Slot[] | undefined> => {
+      const meetingType = app.store.getMeetingType(request.params.id)
+      if (!meetingType) {
+        return reply
+          .code(404)
+          .send({ code: 'meeting_type_not_found', message: 'Тип встречи не найден' })
+      }
+      const slots = freeSlots({
+        durationMinutes: meetingType.durationMinutes,
+        busy: [],
+        now: app.now(),
+      })
+      return slots.map(({ start, end }) => ({
+        start: formatOwnerTime(start),
+        end: formatOwnerTime(end),
+      }))
     },
   )
 
