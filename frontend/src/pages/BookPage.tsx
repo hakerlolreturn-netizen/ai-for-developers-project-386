@@ -10,6 +10,7 @@ import {
   Stack,
   Stepper,
   Text,
+  TextInput,
   Title,
 } from '@mantine/core'
 import { DatePicker } from '@mantine/dates'
@@ -22,6 +23,7 @@ import { api } from '../api.ts'
 type Owner = components['schemas']['Owner']
 type MeetingType = components['schemas']['MeetingType']
 type Slot = components['schemas']['Slot']
+type Meeting = components['schemas']['Meeting']
 
 const WINDOW_DAYS = 14
 
@@ -135,58 +137,107 @@ function TimeStep({
   )
 }
 
-function SelectedMeetingType({
-  id,
-  timeZone,
+const slotRange = (slot: Slot) =>
+  `${dayjs(slotDay(slot)).format('D MMMM')}, ${slotTime(slot)}–${slot.end.slice(11, 16)}`
+
+function DataStep({
+  meetingType,
   slot,
-  onSlot,
-  onNext,
+  onBack,
+  onBooked,
 }: {
-  id: string
-  timeZone: string
-  slot: Slot | null
-  onSlot: (slot: Slot) => void
-  onNext: () => void
+  meetingType: MeetingType
+  slot: Slot
+  onBack: () => void
+  onBooked: (meeting: Meeting) => void
 }) {
-  const [meetingType, setMeetingType] = useState<MeetingType | null>()
+  const [guestName, setGuestName] = useState('')
+  const [guestEmail, setGuestEmail] = useState('')
+  const [fields, setFields] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState<string>()
+  const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    let active = true
-    api.GET('/api/meeting-types/{id}', { params: { path: { id } } }).then(({ data }) => {
-      if (active) setMeetingType(data ?? null)
+  const submit = async () => {
+    setSubmitting(true)
+    const { data, error } = await api.POST('/api/meetings', {
+      body: { meetingTypeId: meetingType.id, start: slot.start, guestName, guestEmail },
     })
-    return () => {
-      active = false
+    setSubmitting(false)
+    if (data) {
+      onBooked(data)
+    } else if (error.code === 'validation_error') {
+      setFields(error.fields)
+      setMessage(undefined)
+    } else {
+      setFields({})
+      setMessage(error.message)
     }
-  }, [id])
-
-  if (meetingType === undefined) return null
-  if (meetingType === null) {
-    return (
-      <Alert mt="md" color="red" title="Такого типа встречи нет">
-        <Anchor component={Link} to="/book">
-          К списку типов встреч
-        </Anchor>
-      </Alert>
-    )
   }
+
   return (
-    <TimeStep
-      meetingType={meetingType}
-      timeZone={timeZone}
-      slot={slot}
-      onSlot={onSlot}
-      onNext={onNext}
-    />
+    <Stack mt="md">
+      <Text>
+        {meetingType.name}: {slotRange(slot)}
+      </Text>
+      {message && <Alert color="red">{message}</Alert>}
+      <TextInput
+        label="Имя"
+        required
+        value={guestName}
+        onChange={(event) => setGuestName(event.currentTarget.value)}
+        error={fields.guestName}
+      />
+      <TextInput
+        label="Email"
+        required
+        value={guestEmail}
+        onChange={(event) => setGuestEmail(event.currentTarget.value)}
+        error={fields.guestEmail}
+      />
+      <Group>
+        <Button variant="default" onClick={onBack}>
+          Назад
+        </Button>
+        <Button loading={submitting} onClick={submit}>
+          Записаться
+        </Button>
+      </Group>
+    </Stack>
+  )
+}
+
+function Confirmation({ meeting }: { meeting: Meeting }) {
+  return (
+    <Stack mt="lg">
+      <Title order={2}>Вы записаны</Title>
+      <Text>{meeting.meetingType.name}</Text>
+      <Text>{slotRange(meeting)}</Text>
+      <Text>{meeting.guestName}</Text>
+      <Text>{meeting.guestEmail}</Text>
+    </Stack>
   )
 }
 
 function Wizard({ id, owner }: { id?: string; owner?: Owner }) {
   const navigate = useNavigate()
+  const [meetingType, setMeetingType] = useState<MeetingType | null>()
   const [slot, setSlot] = useState<Slot | null>(null)
   const [onData, setOnData] = useState(false)
+  const [meeting, setMeeting] = useState<Meeting>()
   const active = !id ? 0 : onData ? 2 : 1
 
+  useEffect(() => {
+    if (!id) return
+    let current = true
+    api.GET('/api/meeting-types/{id}', { params: { path: { id } } }).then(({ data }) => {
+      if (current) setMeetingType(data ?? null)
+    })
+    return () => {
+      current = false
+    }
+  }, [id])
+
+  if (meeting) return <Confirmation meeting={meeting} />
   return (
     <Stepper
       active={active}
@@ -201,9 +252,16 @@ function Wizard({ id, owner }: { id?: string; owner?: Owner }) {
         <MeetingTypeList />
       </Stepper.Step>
       <Stepper.Step label="Время">
-        {id && owner && (
-          <SelectedMeetingType
-            id={id}
+        {meetingType === null && (
+          <Alert mt="md" color="red" title="Такого типа встречи нет">
+            <Anchor component={Link} to="/book">
+              К списку типов встреч
+            </Anchor>
+          </Alert>
+        )}
+        {meetingType && owner && (
+          <TimeStep
+            meetingType={meetingType}
             timeZone={owner.timeZone}
             slot={slot}
             onSlot={setSlot}
@@ -211,7 +269,16 @@ function Wizard({ id, owner }: { id?: string; owner?: Owner }) {
           />
         )}
       </Stepper.Step>
-      <Stepper.Step label="Данные" />
+      <Stepper.Step label="Данные">
+        {meetingType && slot && (
+          <DataStep
+            meetingType={meetingType}
+            slot={slot}
+            onBack={() => setOnData(false)}
+            onBooked={setMeeting}
+          />
+        )}
+      </Stepper.Step>
     </Stepper>
   )
 }

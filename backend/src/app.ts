@@ -9,12 +9,14 @@ type ApiError = components['schemas']['ApiError']
 type MeetingType = components['schemas']['MeetingType']
 type Slot = components['schemas']['Slot']
 type CreateMeetingType = components['schemas']['CreateMeetingType']
+type CreateMeeting = components['schemas']['CreateMeeting']
 
 const VALIDATION_MESSAGES: Record<string, string> = {
   required: 'Обязательное поле',
   minLength: 'Обязательное поле',
   maxLength: 'Слишком длинное значение',
   pattern: 'Неверный формат',
+  format: 'Неверный формат',
   enum: 'Недопустимое значение',
   type: 'Неверный тип значения',
 }
@@ -112,7 +114,7 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
       }
       const slots = freeSlots({
         durationMinutes: meetingType.durationMinutes,
-        busy: [],
+        busy: app.store.busyIntervals(),
         now: app.now(),
       })
       return slots.map(({ start, end }) => ({
@@ -135,6 +137,32 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
         })
       }
       return reply.code(201).send(meetingType)
+    },
+  )
+
+  app.post<{ Body: CreateMeeting }>(
+    '/api/meetings',
+    { schema: contract.routeSchema('MeetingsApi_createMeeting') },
+    async (request, reply) => {
+      const { meetingTypeId, start, guestName, guestEmail } = request.body
+      const meetingType = app.store.getMeetingType(meetingTypeId)
+      if (!meetingType) {
+        return reply
+          .code(404)
+          .send({ code: 'meeting_type_not_found', message: 'Тип встречи не найден' })
+      }
+      const result = app.store.bookMeeting(
+        meetingType,
+        { guestName: guestName.trim(), guestEmail },
+        new Date(start),
+        app.now(),
+      )
+      if ('error' in result) {
+        return reply
+          .code(422)
+          .send({ code: 'slot_unavailable', message: 'Это время недоступно для записи' })
+      }
+      return reply.code(201).send(result.meeting)
     },
   )
 
