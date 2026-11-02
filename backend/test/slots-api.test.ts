@@ -29,6 +29,58 @@ describe('GET /api/meeting-types/{id}/slots', () => {
     expect(slots.map((slot) => slot.start)).toEqual(slots.map((slot) => slot.start).toSorted())
   })
 
+  const starts = (response: { json: () => unknown }) =>
+    (response.json() as { start: string }[]).map((slot) => slot.start)
+
+  it('steps every 15 minutes from 09:00 and ends the last slot at 18:00', async () => {
+    const response = await setup('2026-11-02T06:00:00+03:00', 60)
+
+    const slots = response.json() as { start: string; end: string }[]
+    const monday = slots.filter((slot) => slot.start.startsWith('2026-11-02'))
+    expect(monday).toHaveLength(33)
+    expect(monday[0]).toEqual({
+      start: '2026-11-02T09:00:00+03:00',
+      end: '2026-11-02T10:00:00+03:00',
+    })
+    expect(monday[1]!.start).toBe('2026-11-02T09:15:00+03:00')
+    expect(monday.at(-1)).toEqual({
+      start: '2026-11-02T17:00:00+03:00',
+      end: '2026-11-02T18:00:00+03:00',
+    })
+  })
+
+  it('offers only slots strictly after now today', async () => {
+    const response = await setup('2026-11-02T10:00:00+03:00')
+
+    expect(starts(response)[0]).toBe('2026-11-02T10:15:00+03:00')
+  })
+
+  it('has no slots today after 18:00', async () => {
+    const response = await setup('2026-11-02T18:00:00+03:00', 15)
+
+    expect(starts(response)[0]).toBe('2026-11-03T09:00:00+03:00')
+  })
+
+  it('on Friday evening starts on the next working day', async () => {
+    const response = await setup('2026-11-06T18:30:00+03:00')
+
+    const days = starts(response).map((start) => start.slice(0, 10))
+    expect(days[0]).toBe('2026-11-09')
+    expect(days.at(-1)).toBe('2026-11-19')
+  })
+
+  it('on a Saturday the first slot is Monday 09:00', async () => {
+    const response = await setup('2026-11-07T10:00:00+03:00')
+
+    expect(starts(response)[0]).toBe('2026-11-09T09:00:00+03:00')
+  })
+
+  it('uses the owner day near UTC midnight', async () => {
+    const response = await setup('2026-11-02T22:30:00Z')
+
+    expect(starts(response)[0]).toBe('2026-11-03T09:00:00+03:00')
+  })
+
   it('spans the 14-day window and skips weekends', async () => {
     const response = await setup('2026-11-06T10:00:00+03:00')
 
