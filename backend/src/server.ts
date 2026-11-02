@@ -1,6 +1,6 @@
 import { buildApp } from './app.ts'
 
-const app = buildApp({ logger: true })
+const app = buildApp({ logger: true, staticDir: process.env.STATIC_DIR })
 const port = Number(process.env.PORT ?? 3000)
 const host = process.env.HOST ?? '127.0.0.1'
 

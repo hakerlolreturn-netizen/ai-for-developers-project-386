@@ -1,3 +1,4 @@
+import fastifyStatic from '@fastify/static'
 import Fastify, { type FastifyServerOptions } from 'fastify'
 import type { components } from '../../api/dist/schema.d.ts'
 import { loadContract } from './contract.ts'
@@ -22,7 +23,8 @@ const VALIDATION_MESSAGES: Record<string, string> = {
   type: 'Неверный тип значения',
 }
 
-export type AppOptions = FastifyServerOptions & { now?: () => Date }
+/** `staticDir`: built frontend served at `/`, with `index.html` for unknown non-API GET routes. */
+export type AppOptions = FastifyServerOptions & { now?: () => Date; staticDir?: string }
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -39,7 +41,7 @@ const trimBodyField = (field: string) => async (request: { body?: unknown }) => 
 
 const OWNER: Owner = { name: 'Владелец календаря', timeZone: 'Europe/Moscow' }
 
-export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}) {
+export function buildApp({ now = () => new Date(), staticDir, ...options }: AppOptions = {}) {
   const app = Fastify({
     ...options,
     ajv: { customOptions: { allErrors: true } },
@@ -77,9 +79,14 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
       .send({ code: 'bad_request', message: 'Некорректный запрос' } satisfies ApiError)
   })
 
-  app.setNotFoundHandler((_request, reply) =>
-    reply.code(404).send({ code: 'not_found', message: 'Не найдено' } satisfies ApiError),
-  )
+  if (staticDir) app.register(fastifyStatic, { root: staticDir, wildcard: false })
+
+  app.setNotFoundHandler((request, reply) => {
+    if (staticDir && request.method === 'GET' && !request.url.startsWith('/api/')) {
+      return reply.sendFile('index.html')
+    }
+    return reply.code(404).send({ code: 'not_found', message: 'Не найдено' } satisfies ApiError)
+  })
 
   app.get('/api/health', async () => ({ status: 'ok' }))
 
