@@ -59,6 +59,19 @@ describe('meeting types', () => {
     expect(created.statusCode).toBe(201)
   })
 
+  it('accepts a 100-character name padded with spaces', async () => {
+    const created = await create({ ...valid, name: `  ${'н'.repeat(100)}  ` })
+
+    expect(created.statusCode).toBe(201)
+    expect(created.json().name).toBe('н'.repeat(100))
+  })
+
+  it('reports a blank name as required', async () => {
+    const response = await create({ ...valid, name: '   ' })
+
+    expect(response.json().fields.name).toBe('Обязательное поле')
+  })
+
   it('rejects a repeated id and keeps the existing meeting type', async () => {
     await create(valid)
 

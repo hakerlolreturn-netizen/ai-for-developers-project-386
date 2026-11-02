@@ -31,6 +31,12 @@ declare module 'fastify' {
   }
 }
 
+/** Trims a string body field before schema validation, so length rules apply to the trimmed value. */
+const trimBodyField = (field: string) => async (request: { body?: unknown }) => {
+  const body = request.body as Record<string, unknown> | undefined
+  if (typeof body?.[field] === 'string') body[field] = body[field].trim()
+}
+
 const OWNER: Owner = { name: 'Владелец календаря', timeZone: 'Europe/Moscow' }
 
 export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}) {
@@ -127,10 +133,13 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
 
   app.post<{ Body: CreateMeetingType }>(
     '/api/meeting-types',
-    { schema: contract.routeSchema('MeetingTypesApi_createMeetingType') },
+    {
+      schema: contract.routeSchema('MeetingTypesApi_createMeetingType'),
+      preValidation: trimBodyField('name'),
+    },
     async (request, reply) => {
       const { id, name, description = '', durationMinutes } = request.body
-      const meetingType: MeetingType = { id, name: name.trim(), description, durationMinutes }
+      const meetingType: MeetingType = { id, name, description, durationMinutes }
       if (!app.store.addMeetingType(meetingType)) {
         return reply.code(409).send({
           code: 'meeting_type_id_taken',
@@ -155,7 +164,10 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
 
   app.post<{ Body: CreateMeeting }>(
     '/api/meetings',
-    { schema: contract.routeSchema('MeetingsApi_createMeeting') },
+    {
+      schema: contract.routeSchema('MeetingsApi_createMeeting'),
+      preValidation: trimBodyField('guestName'),
+    },
     async (request, reply) => {
       const { meetingTypeId, start, guestName, guestEmail } = request.body
       const meetingType = app.store.getMeetingType(meetingTypeId)
@@ -166,7 +178,7 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
       }
       const result = app.store.bookMeeting(
         meetingType,
-        { guestName: guestName.trim(), guestEmail },
+        { guestName, guestEmail },
         new Date(start),
         app.now(),
       )

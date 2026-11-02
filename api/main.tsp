@@ -42,7 +42,7 @@ model CreateMeetingType {
   @maxLength(50)
   id: string;
 
-  @pattern("\\S")
+  @minLength(1)
   @maxLength(100)
   name: string;
 
@@ -83,7 +83,7 @@ model CreateMeeting {
   meetingTypeId: string;
   start: utcDateTime;
 
-  @pattern("\\S")
+  @minLength(1)
   @maxLength(100)
   guestName: string;
 
