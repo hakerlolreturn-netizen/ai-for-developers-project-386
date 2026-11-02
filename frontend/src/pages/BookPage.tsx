@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { components } from '../../../api/dist/schema.d.ts'
 import { api } from '../api.ts'
+import { inZone } from '../time.ts'
 
 type Owner = components['schemas']['Owner']
 type MeetingType = components['schemas']['MeetingType']
@@ -27,9 +28,8 @@ type Meeting = components['schemas']['Meeting']
 
 const WINDOW_DAYS = 14
 
-// Slot times carry the owner's offset, so the date and time are read from the string as is.
-const slotDay = (slot: Slot) => slot.start.slice(0, 10)
-const slotTime = (slot: Slot) => slot.start.slice(11, 16)
+const slotDay = (slot: Slot, timeZone: string) => inZone(slot.start, timeZone).format('YYYY-MM-DD')
+const slotTime = (slot: Slot, timeZone: string) => inZone(slot.start, timeZone).format('HH:mm')
 
 function MeetingTypeList() {
   const [meetingTypes, setMeetingTypes] = useState<MeetingType[]>()
@@ -79,7 +79,7 @@ function TimeStep({
   onNext: () => void
 }) {
   const [slots, setSlots] = useState<Slot[]>()
-  const [day, setDay] = useState<string | null>(slot ? slotDay(slot) : null)
+  const [day, setDay] = useState<string | null>(slot ? slotDay(slot, timeZone) : null)
 
   useEffect(() => {
     let active = true
@@ -97,8 +97,8 @@ function TimeStep({
   const maxDate = dayjs(today)
     .add(WINDOW_DAYS - 1, 'day')
     .format('YYYY-MM-DD')
-  const freeDays = new Set(slots?.map(slotDay))
-  const daySlots = slots?.filter((candidate) => slotDay(candidate) === day) ?? []
+  const freeDays = new Set(slots?.map((candidate) => slotDay(candidate, timeZone)))
+  const daySlots = slots?.filter((candidate) => slotDay(candidate, timeZone) === day) ?? []
 
   return (
     <Stack mt="md">
@@ -120,7 +120,7 @@ function TimeStep({
               variant={slot?.start === candidate.start ? 'filled' : 'default'}
               onClick={() => onSlot(candidate)}
             >
-              {slotTime(candidate)}
+              {slotTime(candidate, timeZone)}
             </Button>
           ))}
         </SimpleGrid>
@@ -137,17 +137,19 @@ function TimeStep({
   )
 }
 
-const slotRange = (slot: Slot) =>
-  `${dayjs(slotDay(slot)).format('D MMMM')}, ${slotTime(slot)}–${slot.end.slice(11, 16)}`
+const slotRange = (slot: Slot, timeZone: string) =>
+  `${inZone(slot.start, timeZone).format('D MMMM')}, ${slotTime(slot, timeZone)}–${slotTime({ start: slot.end }, timeZone)}`
 
 function DataStep({
   meetingType,
+  timeZone,
   slot,
   onSlot,
   onBack,
   onBooked,
 }: {
   meetingType: MeetingType
+  timeZone: string
   slot: Slot | null
   onSlot: (slot: Slot | null) => void
   onBack: () => void
@@ -176,11 +178,11 @@ function DataStep({
         setFields({})
         setMessage(error.message)
         if (error.code === 'slot_taken' || error.code === 'slot_unavailable') {
-          const day = slotDay(slot)
+          const day = slotDay(slot, timeZone)
           const fresh = await api.GET('/api/meeting-types/{id}/slots', {
             params: { path: { id: meetingType.id } },
           })
-          setDaySlots(fresh.data?.filter((candidate) => slotDay(candidate) === day) ?? [])
+          setDaySlots(fresh.data?.filter((candidate) => slotDay(candidate, timeZone) === day) ?? [])
           onSlot(null)
         }
       }
@@ -195,22 +197,25 @@ function DataStep({
     <Stack mt="md">
       {slot && (
         <Text>
-          {meetingType.name}: {slotRange(slot)}
+          {meetingType.name}: {slotRange(slot, timeZone)}
         </Text>
       )}
-      {message && (
-        <Alert color="red">
-          {message}
-          {!slot && daySlots && (
-            <SimpleGrid cols={4} spacing="xs" mt="xs">
-              {daySlots.map((candidate) => (
-                <Button key={candidate.start} variant="default" onClick={() => onSlot(candidate)}>
-                  {slotTime(candidate)}
-                </Button>
-              ))}
-            </SimpleGrid>
-          )}
-        </Alert>
+      {message && <Alert color="red">{message}</Alert>}
+      {daySlots && (
+        <SimpleGrid cols={4} spacing="xs">
+          {daySlots.map((candidate) => (
+            <Button
+              key={candidate.start}
+              variant={slot?.start === candidate.start ? 'filled' : 'default'}
+              onClick={() => {
+                setMessage(undefined)
+                onSlot(candidate)
+              }}
+            >
+              {slotTime(candidate, timeZone)}
+            </Button>
+          ))}
+        </SimpleGrid>
       )}
       <TextInput
         label="Имя"
@@ -238,12 +243,12 @@ function DataStep({
   )
 }
 
-function Confirmation({ meeting }: { meeting: Meeting }) {
+function Confirmation({ meeting, timeZone }: { meeting: Meeting; timeZone: string }) {
   return (
     <Stack mt="lg">
       <Title order={2}>Вы записаны</Title>
       <Text>{meeting.meetingType.name}</Text>
-      <Text>{slotRange(meeting)}</Text>
+      <Text>{slotRange(meeting, timeZone)}</Text>
       <Text>{meeting.guestName}</Text>
       <Text>{meeting.guestEmail}</Text>
     </Stack>
@@ -269,7 +274,7 @@ function Wizard({ id, owner }: { id?: string; owner?: Owner }) {
     }
   }, [id])
 
-  if (meeting) return <Confirmation meeting={meeting} />
+  if (meeting && owner) return <Confirmation meeting={meeting} timeZone={owner.timeZone} />
   return (
     <Stepper
       active={active}
@@ -302,9 +307,10 @@ function Wizard({ id, owner }: { id?: string; owner?: Owner }) {
         )}
       </Stepper.Step>
       <Stepper.Step label="Данные">
-        {meetingType && onData && (
+        {meetingType && owner && onData && (
           <DataStep
             meetingType={meetingType}
+            timeZone={owner.timeZone}
             slot={slot}
             onSlot={setSlot}
             onBack={() => setOnData(false)}
