@@ -84,6 +84,23 @@ describe('POST /api/meetings', () => {
     expect(response.json().fields).toHaveProperty('guestName')
   })
 
+  it('accepts a 100-character name padded with spaces', async () => {
+    await setup()
+
+    const response = await book({ guestName: `  ${'a'.repeat(100)}  ` })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().guestName).toBe('a'.repeat(100))
+  })
+
+  it('reports a blank name as required', async () => {
+    await setup()
+
+    const response = await book({ guestName: '   ' })
+
+    expect(response.json().fields.guestName).toBe('Обязательное поле')
+  })
+
   it('answers 404 meeting_type_not_found for an unknown type', async () => {
     await setup()
 

@@ -14,11 +14,13 @@ let stored: Stored[]
 let slots: Slot[]
 let bookings: Record<string, unknown>[]
 let bookingReply: () => Response
+let ownerTimeZone: string
 
 beforeEach(() => {
   stored = []
   slots = []
   bookings = []
+  ownerTimeZone = 'Europe/Moscow'
   bookingReply = () => Response.json({}, { status: 201 })
   vi.stubGlobal(
     'fetch',
@@ -29,7 +31,7 @@ beforeEach(() => {
         return bookingReply()
       }
       if (pathname === '/api/owner') {
-        return Response.json({ name: 'Владелец календаря', timeZone: 'Europe/Moscow' })
+        return Response.json({ name: 'Владелец календаря', timeZone: ownerTimeZone })
       }
       if (pathname === '/api/meeting-types') return Response.json(stored)
       if (pathname.endsWith('/slots')) return Response.json(slots)
@@ -184,11 +186,8 @@ describe('шаг «Время»', () => {
 })
 
 describe('шаг «Данные»', () => {
-  const moscowToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(
-    new Date(),
-  )
-  const tomorrow = dayjs(moscowToday).add(1, 'day')
-  const date = tomorrow.format('YYYY-MM-DD')
+  const date = '2026-11-03'
+  const tomorrowLabel = '3 November 2026'
   const slot = { start: `${date}T09:00:00+03:00`, end: `${date}T09:30:00+03:00` }
 
   const meeting = {
@@ -199,24 +198,35 @@ describe('шаг «Данные»', () => {
     guestEmail: 'anna@example.com',
   }
 
-  async function openDataStep() {
+  async function openDataStep(time = '09:00') {
     renderAt('/book/intro')
-    await userEvent.click(
-      await screen.findByRole('button', { name: tomorrow.format('D MMMM YYYY') }),
-    )
-    await userEvent.click(screen.getByRole('button', { name: '09:00' }))
+    await userEvent.click(await screen.findByRole('button', { name: tomorrowLabel }))
+    await userEvent.click(screen.getByRole('button', { name: time }))
     await userEvent.click(screen.getByRole('button', { name: 'Далее' }))
   }
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T10:00:00+03:00'))
     stored.push({ id: 'intro', name: 'Знакомство', description: '', durationMinutes: 30 })
     slots = [slot]
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('показывает сводку: тип, день, начало–конец', async () => {
     await openDataStep()
 
-    expect(screen.getByText(`Знакомство: ${tomorrow.format('D MMMM')}, 09:00–09:30`)).toBeTruthy()
+    expect(screen.getByText('Знакомство: 3 ноября, 09:00–09:30')).toBeTruthy()
+  })
+
+  it('показывает время в часовом поясе владельца', async () => {
+    ownerTimeZone = 'Asia/Yekaterinburg'
+    await openDataStep('11:00')
+
+    expect(screen.getByText('Знакомство: 3 ноября, 11:00–11:30')).toBeTruthy()
   })
 
   it('отправляет данные и показывает подтверждение', async () => {
@@ -237,7 +247,7 @@ describe('шаг «Данные»', () => {
       },
     ])
     expect(screen.getByText('Знакомство')).toBeTruthy()
-    expect(screen.getByText(`${tomorrow.format('D MMMM')}, 09:00–09:30`)).toBeTruthy()
+    expect(screen.getByText('3 ноября, 09:00–09:30')).toBeTruthy()
     expect(screen.getByText('Анна')).toBeTruthy()
     expect(screen.getByText('anna@example.com')).toBeTruthy()
   })
@@ -284,7 +294,7 @@ describe('шаг «Данные»', () => {
     await openDataStep()
     await userEvent.type(screen.getByRole('textbox', { name: /Имя/ }), 'Анна')
     await userEvent.type(screen.getByRole('textbox', { name: /Email/ }), 'anna@example.com')
-    slots = [other]
+    slots = [other, { start: `${date}T10:30:00+03:00`, end: `${date}T11:00:00+03:00` }]
 
     await userEvent.click(screen.getByRole('button', { name: 'Записаться' }))
 
@@ -299,8 +309,15 @@ describe('шаг «Данные»', () => {
       true,
     )
 
-    bookingReply = () => Response.json({ ...meeting, ...other }, { status: 201 })
     await userEvent.click(screen.getByRole('button', { name: '10:00' }))
+
+    expect(screen.queryByText('Это время уже занято. Выберите другой слот')).toBeNull()
+    expect(screen.getByText('Знакомство: 3 ноября, 10:00–10:30')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '10:30' }))
+    expect(screen.getByText('Знакомство: 3 ноября, 10:30–11:00')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '10:00' }))
+
+    bookingReply = () => Response.json({ ...meeting, ...other }, { status: 201 })
     await userEvent.click(screen.getByRole('button', { name: 'Записаться' }))
 
     expect(await screen.findByText('Вы записаны')).toBeTruthy()

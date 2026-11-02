@@ -2,7 +2,7 @@ import { MantineProvider } from '@mantine/core'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import MeetingsPage from './MeetingsPage.tsx'
+import App from '../App.tsx'
 
 type Stub = {
   id: string
@@ -29,15 +29,20 @@ const meeting = (
 })
 
 let meetings: Stub[]
+let ownerTimeZone: string
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-29T10:15:00+03:00'))
   meetings = []
+  ownerTimeZone = 'Europe/Moscow'
   fetchMock = vi.fn(async (input: Request) => {
     const { pathname } = new URL(input.url)
     if (pathname === '/api/meetings') return Response.json(meetings)
+    if (pathname === '/api/owner') {
+      return Response.json({ name: 'Владелец календаря', timeZone: ownerTimeZone })
+    }
     return Response.json({ code: 'not_found', message: 'Не найдено' }, { status: 404 })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -52,8 +57,8 @@ afterEach(() => {
 function renderPage() {
   render(
     <MantineProvider>
-      <MemoryRouter>
-        <MeetingsPage />
+      <MemoryRouter initialEntries={['/meetings']}>
+        <App />
       </MemoryRouter>
     </MantineProvider>,
   )
@@ -84,6 +89,17 @@ describe('предстоящие встречи', () => {
     expect(screen.queryByText('Предстоящих встреч нет')).toBeNull()
   })
 
+  it('показывает время в часовом поясе владельца', async () => {
+    ownerTimeZone = 'Asia/Yekaterinburg'
+    meetings = [
+      meeting('a', 'Знакомство', '2026-10-29T22:00:00+03:00', '2026-10-29T22:30:00+03:00', 'Анна'),
+    ]
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'пятница, 30 октября' })).toBeTruthy()
+    expect(screen.getByText('00:00–00:30 · Знакомство · Анна · a@example.com')).toBeTruthy()
+  })
+
   it('помечает идущую встречу значком', async () => {
     meetings = [
       meeting('a', 'Знакомство', '2026-10-29T10:00:00+03:00', '2026-10-29T10:30:00+03:00', 'Анна'),
@@ -100,6 +116,9 @@ describe('предстоящие встречи', () => {
     renderPage()
     await screen.findByText('Предстоящих встреч нет')
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const meetingCalls = fetchMock.mock.calls.filter(
+      ([input]) => new URL(input.url).pathname === '/api/meetings',
+    )
+    expect(meetingCalls).toHaveLength(1)
   })
 })
