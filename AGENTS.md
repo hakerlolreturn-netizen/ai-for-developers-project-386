@@ -1,6 +1,6 @@
 # AGENTS.md
 
-npm workspaces: `backend/` (Fastify + TypeScript, routes in `src/app.ts` under `/api`) and `frontend/` (Vite + React + Mantine, proxies `/api` to `127.0.0.1:3000`). Node from `.nvmrc`.
+npm workspaces: `api/` (TypeSpec contract, `api/main.tsp`; generated `api/dist/` is not committed), `backend/` (Fastify + TypeScript, routes in `src/app.ts` under `/api`) and `frontend/` (Vite + React + Mantine, proxies `/api` to `127.0.0.1:3000`). Node from `.nvmrc`.
 
 ## Commands
 
@@ -8,9 +8,10 @@ Run from the repo root.
 
 ```bash
 npm ci                 # install
+npm run gen            # TypeSpec -> api/dist/openapi.yaml + schema.d.ts (runs before dev, typecheck, test, build)
 npm run dev            # backend :3000 + frontend :5173
 npm test               # vitest (backend)
-npm test -w backend -- test/health.test.ts   # single test file
+npm test -w backend -- test/health.test.ts   # single test file (run `npm run gen` first)
 npm run lint           # oxlint + prettier --check
 npm run format         # prettier --write
 npm run typecheck      # tsc in both workspaces
