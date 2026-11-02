@@ -96,4 +96,23 @@ describe('meeting types', () => {
     const list = await app.inject({ method: 'GET', url: '/api/meeting-types' })
     expect(list.json()).toEqual([])
   })
+
+  it('returns a meeting type by id', async () => {
+    await create(valid)
+
+    const response = await app.inject({ method: 'GET', url: '/api/meeting-types/intro' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual(valid)
+  })
+
+  it('answers 404 meeting_type_not_found for an unknown id', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/meeting-types/unknown' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({
+      code: 'meeting_type_not_found',
+      message: 'Тип встречи не найден',
+    })
+  })
 })
