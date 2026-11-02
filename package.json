@@ -19,7 +19,7 @@
     "prebuild": "npm run gen",
     "build": "npm run build --workspaces --if-present",
     "pretest": "npm run gen",
-    "test": "npm test --workspaces --if-present",
+    "test": "npm test -w backend -w frontend",
     "pretypecheck": "npm run gen",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "oxlint --deny-warnings && prettier --check .",
