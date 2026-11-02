@@ -84,6 +84,20 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
     async (): Promise<MeetingType[]> => app.store.listMeetingTypes(),
   )
 
+  app.get<{ Params: { id: string } }>(
+    '/api/meeting-types/:id',
+    { schema: contract.routeSchema('MeetingTypesApi_getMeetingType') },
+    async (request, reply) => {
+      const meetingType = app.store.getMeetingType(request.params.id)
+      if (!meetingType) {
+        return reply
+          .code(404)
+          .send({ code: 'meeting_type_not_found', message: 'Тип встречи не найден' })
+      }
+      return meetingType
+    },
+  )
+
   app.post<{ Body: CreateMeetingType }>(
     '/api/meeting-types',
     { schema: contract.routeSchema('MeetingTypesApi_createMeetingType') },

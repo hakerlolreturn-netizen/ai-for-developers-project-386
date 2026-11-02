@@ -67,11 +67,22 @@ model MeetingTypeIdTaken {
   message: string;
 }
 
+@error
+model MeetingTypeNotFound {
+  @statusCode _: 404;
+  code: "meeting_type_not_found";
+  message: string;
+}
+
 @route("/api/meeting-types")
 @tag("meeting-types")
 interface MeetingTypesApi {
   @get
   listMeetingTypes(): MeetingType[];
+
+  @get
+  @route("{id}")
+  getMeetingType(@path id: string): MeetingType | MeetingTypeNotFound;
 
   @post
   createMeetingType(@body body: CreateMeetingType): {

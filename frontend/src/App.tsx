@@ -31,7 +31,7 @@ function App() {
       <AppShell.Main>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/book" element={<BookPage />} />
+          <Route path="/book/:id?" element={<BookPage />} />
           <Route path="/meeting-types" element={<MeetingTypesPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
         </Routes>
