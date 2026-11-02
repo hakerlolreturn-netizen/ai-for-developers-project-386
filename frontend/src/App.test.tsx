@@ -1,21 +1,40 @@
 import { MantineProvider } from '@mantine/core'
+import { DatesProvider } from '@mantine/dates'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.tsx'
 
 function renderAt(path: string) {
   render(
     <MantineProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <App />
-      </MemoryRouter>
+      <DatesProvider settings={{ locale: 'ru', firstDayOfWeek: 1 }}>
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+        </MemoryRouter>
+      </DatesProvider>
     </MantineProvider>,
   )
 }
 
-afterEach(cleanup)
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: Request) => {
+      const { pathname } = new URL(input.url)
+      if (pathname === '/api/owner') {
+        return Response.json({ name: 'Владелец календаря', timeZone: 'Europe/Moscow' })
+      }
+      return Response.json({ code: 'not_found', message: 'Не найдено' }, { status: 404 })
+    }),
+  )
+})
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 describe('главная страница', () => {
   it('рассказывает про сервис и шаги записи', () => {
@@ -46,8 +65,7 @@ describe('главная страница', () => {
       within(screen.getByRole('main')).getByRole('link', { name: 'Записаться' }),
     )
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Запись на звонок' })).toBeTruthy()
-    expect(screen.getByText('Скоро здесь можно будет выбрать тип встречи и слот')).toBeTruthy()
+    expect(await screen.findByText('Владелец календаря')).toBeTruthy()
   })
 
   it('со страницы записи можно вернуться на главную', async () => {
@@ -56,6 +74,15 @@ describe('главная страница', () => {
     await userEvent.click(screen.getByRole('link', { name: 'На главную' }))
 
     expect(screen.getByText('Выберите тип встречи')).toBeTruthy()
+  })
+})
+
+describe('страница записи', () => {
+  it('показывает имя владельца из API и пометку о времени по Москве', async () => {
+    renderAt('/book')
+
+    expect(await screen.findByText('Владелец календаря')).toBeTruthy()
+    expect(screen.getByText(/время по Москве/)).toBeTruthy()
   })
 })
 
@@ -73,7 +100,7 @@ describe('панель сверху', () => {
       within(screen.getByRole('banner')).getByRole('link', { name: 'Записаться' }),
     )
 
-    expect(screen.getByText('Скоро здесь можно будет выбрать тип встречи и слот')).toBeTruthy()
+    expect(await screen.findByText('Владелец календаря')).toBeTruthy()
   })
 
   it('«Предстоящие встречи» ведёт на страницу предстоящих встреч', async () => {
@@ -83,6 +110,8 @@ describe('панель сверху', () => {
       within(screen.getByRole('banner')).getByRole('link', { name: 'Предстоящие встречи' }),
     )
 
-    expect(screen.getByText('Скоро здесь появится список предстоящих встреч')).toBeTruthy()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Предстоящие встречи · время по Москве' }),
+    ).toBeTruthy()
   })
 })

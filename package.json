@@ -4,19 +4,28 @@
   "private": true,
   "type": "module",
   "workspaces": [
+    "api",
     "backend",
-    "frontend"
+    "frontend",
+    "e2e"
   ],
   "engines": {
     "node": ">=24"
   },
   "scripts": {
+    "gen": "npm run gen -w api",
+    "predev": "npm run gen",
     "dev": "concurrently -n backend,frontend \"npm run dev -w backend\" \"npm run dev -w frontend\"",
-    "build": "npm run build --workspaces",
-    "test": "npm test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces",
+    "prebuild": "npm run gen",
+    "build": "npm run build --workspaces --if-present",
+    "pretest": "npm run gen",
+    "test": "npm test -w backend -w frontend",
+    "pretypecheck": "npm run gen",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "oxlint --deny-warnings && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "e2e": "npm test -w e2e",
+    "check": "npm run gen && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",

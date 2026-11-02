@@ -10,3 +10,10 @@ window.matchMedia = (query: string) =>
     removeEventListener: () => {},
     dispatchEvent: () => false,
   }) as MediaQueryList
+
+// jsdom has no ResizeObserver; Mantine SegmentedControl uses it.
+globalThis.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
