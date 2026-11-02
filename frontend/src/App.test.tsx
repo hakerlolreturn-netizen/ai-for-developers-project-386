@@ -110,6 +110,8 @@ describe('панель сверху', () => {
       within(screen.getByRole('banner')).getByRole('link', { name: 'Предстоящие встречи' }),
     )
 
-    expect(screen.getByText('Скоро здесь появится список предстоящих встреч')).toBeTruthy()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Предстоящие встречи · время по Москве' }),
+    ).toBeTruthy()
   })
 })

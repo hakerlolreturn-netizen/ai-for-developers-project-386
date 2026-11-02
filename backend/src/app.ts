@@ -9,6 +9,7 @@ type ApiError = components['schemas']['ApiError']
 type MeetingType = components['schemas']['MeetingType']
 type Slot = components['schemas']['Slot']
 type CreateMeetingType = components['schemas']['CreateMeetingType']
+type Meeting = components['schemas']['Meeting']
 type CreateMeeting = components['schemas']['CreateMeeting']
 
 const VALIDATION_MESSAGES: Record<string, string> = {
@@ -137,6 +138,18 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
         })
       }
       return reply.code(201).send(meetingType)
+    },
+  )
+
+  app.get(
+    '/api/meetings',
+    { schema: contract.routeSchema('MeetingsApi_listUpcomingMeetings') },
+    async (): Promise<Meeting[]> => {
+      const current = app.now().getTime()
+      return app.store
+        .listMeetings()
+        .filter((meeting) => new Date(meeting.end).getTime() > current)
+        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
     },
   )
 

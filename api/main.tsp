@@ -144,6 +144,9 @@ interface MeetingTypesApi {
 @route("/api/meetings")
 @tag("meetings")
 interface MeetingsApi {
+  @get
+  listUpcomingMeetings(): Meeting[];
+
   @post
   createMeeting(@body body: CreateMeeting): {
     @statusCode _: 201;
