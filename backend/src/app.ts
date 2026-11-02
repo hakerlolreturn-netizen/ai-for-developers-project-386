@@ -1,15 +1,28 @@
 import Fastify, { type FastifyServerOptions } from 'fastify'
 import type { components } from '../../api/dist/schema.d.ts'
 import { loadContract } from './contract.ts'
+import { createStore } from './store.ts'
 
 type Owner = components['schemas']['Owner']
 type ApiError = components['schemas']['ApiError']
+type MeetingType = components['schemas']['MeetingType']
+type CreateMeetingType = components['schemas']['CreateMeetingType']
+
+const VALIDATION_MESSAGES: Record<string, string> = {
+  required: 'Обязательное поле',
+  minLength: 'Обязательное поле',
+  maxLength: 'Слишком длинное значение',
+  pattern: 'Неверный формат',
+  enum: 'Недопустимое значение',
+  type: 'Неверный тип значения',
+}
 
 export type AppOptions = FastifyServerOptions & { now?: () => Date }
 
 declare module 'fastify' {
   interface FastifyInstance {
     now: () => Date
+    store: ReturnType<typeof createStore>
   }
 }
 
@@ -21,6 +34,7 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
     ajv: { customOptions: { allErrors: true } },
   })
   app.decorate('now', now)
+  app.decorate('store', createStore())
 
   const contract = loadContract(app)
 
@@ -30,11 +44,11 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
       for (const issue of error.validation as {
         instancePath: string
         params: { missingProperty?: string }
-        message?: string
+        keyword: string
       }[]) {
         const path = issue.instancePath.replace(/^\//, '').replaceAll('/', '.')
         const field = issue.params.missingProperty ?? path
-        fields[field] ??= issue.message ?? 'invalid'
+        fields[field] ??= VALIDATION_MESSAGES[issue.keyword] ?? 'Некорректное значение'
       }
       return reply
         .code(400)
@@ -62,6 +76,28 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
     '/api/owner',
     { schema: contract.routeSchema('OwnerApi_getOwner') },
     async (): Promise<Owner> => OWNER,
+  )
+
+  app.get(
+    '/api/meeting-types',
+    { schema: contract.routeSchema('MeetingTypesApi_listMeetingTypes') },
+    async (): Promise<MeetingType[]> => app.store.listMeetingTypes(),
+  )
+
+  app.post<{ Body: CreateMeetingType }>(
+    '/api/meeting-types',
+    { schema: contract.routeSchema('MeetingTypesApi_createMeetingType') },
+    async (request, reply) => {
+      const { id, name, description = '', durationMinutes } = request.body
+      const meetingType: MeetingType = { id, name: name.trim(), description, durationMinutes }
+      if (!app.store.addMeetingType(meetingType)) {
+        return reply.code(409).send({
+          code: 'meeting_type_id_taken',
+          message: 'Тип встречи с таким id уже существует',
+        })
+      }
+      return reply.code(201).send(meetingType)
+    },
   )
 
   return app
