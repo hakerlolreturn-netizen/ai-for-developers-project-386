@@ -5,7 +5,7 @@ import { formatOwnerTime, freeSlots, type Interval } from './slots.ts'
 export type MeetingType = components['schemas']['MeetingType']
 export type Meeting = components['schemas']['Meeting']
 
-export type BookResult = { meeting: Meeting } | { error: 'slot_unavailable' }
+export type BookResult = { meeting: Meeting } | { error: 'slot_unavailable' | 'slot_taken' }
 
 /** In-memory storage (ADR 0003). */
 export function createStore() {
@@ -40,7 +40,11 @@ export function createStore() {
         busy: busyIntervals(),
         now,
       }).find((candidate) => candidate.start.getTime() === start.getTime())
-      if (!slot) return { error: 'slot_unavailable' }
+      if (!slot) {
+        const bookable = freeSlots({ durationMinutes: meetingType.durationMinutes, busy: [], now })
+        const valid = bookable.some((candidate) => candidate.start.getTime() === start.getTime())
+        return { error: valid ? 'slot_taken' : 'slot_unavailable' }
+      }
       const { id, name, durationMinutes } = meetingType
       const meeting: Meeting = {
         id: randomUUID(),

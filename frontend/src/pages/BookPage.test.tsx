@@ -273,4 +273,56 @@ describe('шаг «Данные»', () => {
 
     expect(await screen.findByText('Это время недоступно для записи')).toBeTruthy()
   })
+
+  it('при конфликте остаётся на «Данные» со свежими слотами дня и позволяет записаться заново', async () => {
+    const other = { start: `${date}T10:00:00+03:00`, end: `${date}T10:30:00+03:00` }
+    bookingReply = () =>
+      Response.json(
+        { code: 'slot_taken', message: 'Это время уже занято. Выберите другой слот' },
+        { status: 409 },
+      )
+    await openDataStep()
+    await userEvent.type(screen.getByRole('textbox', { name: /Имя/ }), 'Анна')
+    await userEvent.type(screen.getByRole('textbox', { name: /Email/ }), 'anna@example.com')
+    slots = [other]
+
+    await userEvent.click(screen.getByRole('button', { name: 'Записаться' }))
+
+    expect(await screen.findByText('Это время уже занято. Выберите другой слот')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '09:00' })).toBeNull()
+    expect(screen.queryByText(/09:00–09:30/)).toBeNull()
+    expect((screen.getByRole('textbox', { name: /Имя/ }) as HTMLInputElement).value).toBe('Анна')
+    expect((screen.getByRole('textbox', { name: /Email/ }) as HTMLInputElement).value).toBe(
+      'anna@example.com',
+    )
+    expect((screen.getByRole('button', { name: 'Записаться' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+
+    bookingReply = () => Response.json({ ...meeting, ...other }, { status: 201 })
+    await userEvent.click(screen.getByRole('button', { name: '10:00' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Записаться' }))
+
+    expect(await screen.findByText('Вы записаны')).toBeTruthy()
+    expect(bookings[1]).toEqual({
+      meetingTypeId: 'intro',
+      start: other.start,
+      guestName: 'Анна',
+      guestEmail: 'anna@example.com',
+    })
+  })
+
+  it('показывает сообщение, если запрос не удался', async () => {
+    bookingReply = () => {
+      throw new TypeError('Failed to fetch')
+    }
+    await openDataStep()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Записаться' }))
+
+    expect(await screen.findByText('Не удалось отправить запрос. Попробуйте ещё раз')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Записаться' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    )
+  })
 })
