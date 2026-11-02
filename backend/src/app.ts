@@ -158,6 +158,11 @@ export function buildApp({ now = () => new Date(), ...options }: AppOptions = {}
         app.now(),
       )
       if ('error' in result) {
+        if (result.error === 'slot_taken') {
+          return reply
+            .code(409)
+            .send({ code: 'slot_taken', message: 'Это время уже занято. Выберите другой слот' })
+        }
         return reply
           .code(422)
           .send({ code: 'slot_unavailable', message: 'Это время недоступно для записи' })

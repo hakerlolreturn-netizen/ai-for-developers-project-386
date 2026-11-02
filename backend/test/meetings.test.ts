@@ -118,7 +118,33 @@ describe('POST /api/meetings', () => {
 
     const response = await book({ start: '2026-11-03T09:15:00+03:00', guestEmail: 'b@example.com' })
 
-    expect(response.statusCode).toBe(422)
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({
+      code: 'slot_taken',
+      message: 'Это время уже занято. Выберите другой слот',
+    })
+  })
+
+  it('treats intervals as half-open', async () => {
+    await setup()
+    await book({ meetingTypeId: 'deep-dive', start: '2026-11-03T10:00:00+03:00' })
+
+    const inside = await book({ start: '2026-11-03T10:30:00+03:00' })
+    const adjacent = await book({ start: '2026-11-03T11:00:00+03:00' })
+
+    expect(inside.statusCode).toBe(409)
+    expect(adjacent.statusCode).toBe(201)
+  })
+
+  it('accepts exactly one of two parallel overlapping requests of different types', async () => {
+    await setup()
+
+    const responses = await Promise.all([
+      book({ meetingTypeId: 'deep-dive', start: '2026-11-03T10:00:00+03:00' }),
+      book({ meetingTypeId: 'intro', start: '2026-11-03T10:30:00+03:00' }),
+    ])
+
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([201, 409])
   })
 
   it('removes the booked slot and overlapping slots of other types', async () => {

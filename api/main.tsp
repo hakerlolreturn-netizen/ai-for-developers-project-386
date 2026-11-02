@@ -113,6 +113,13 @@ model SlotUnavailable {
   message: string;
 }
 
+@error
+model SlotTaken {
+  @statusCode _: 409;
+  code: "slot_taken";
+  message: string;
+}
+
 @route("/api/meeting-types")
 @tag("meeting-types")
 interface MeetingTypesApi {
@@ -141,5 +148,5 @@ interface MeetingsApi {
   createMeeting(@body body: CreateMeeting): {
     @statusCode _: 201;
     @body body: Meeting;
-  } | ValidationError | MeetingTypeNotFound | SlotUnavailable;
+  } | ValidationError | MeetingTypeNotFound | SlotUnavailable | SlotTaken;
 }
