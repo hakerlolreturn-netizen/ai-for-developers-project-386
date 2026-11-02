@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+.git
+.idea
+.claude
+.agents
+.env
+e2e/test-results
+e2e/playwright-report
