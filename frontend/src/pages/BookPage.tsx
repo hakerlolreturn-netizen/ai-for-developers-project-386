@@ -143,11 +143,13 @@ const slotRange = (slot: Slot) =>
 function DataStep({
   meetingType,
   slot,
+  onSlot,
   onBack,
   onBooked,
 }: {
   meetingType: MeetingType
-  slot: Slot
+  slot: Slot | null
+  onSlot: (slot: Slot | null) => void
   onBack: () => void
   onBooked: (meeting: Meeting) => void
 }) {
@@ -155,31 +157,61 @@ function DataStep({
   const [guestEmail, setGuestEmail] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string>()
+  const [daySlots, setDaySlots] = useState<Slot[]>()
   const [submitting, setSubmitting] = useState(false)
 
   const submit = async () => {
+    if (!slot) return
     setSubmitting(true)
-    const { data, error } = await api.POST('/api/meetings', {
-      body: { meetingTypeId: meetingType.id, start: slot.start, guestName, guestEmail },
-    })
-    setSubmitting(false)
-    if (data) {
-      onBooked(data)
-    } else if (error.code === 'validation_error') {
-      setFields(error.fields)
-      setMessage(undefined)
-    } else {
+    try {
+      const { data, error } = await api.POST('/api/meetings', {
+        body: { meetingTypeId: meetingType.id, start: slot.start, guestName, guestEmail },
+      })
+      if (data) {
+        onBooked(data)
+      } else if (error.code === 'validation_error') {
+        setFields(error.fields)
+        setMessage(undefined)
+      } else {
+        setFields({})
+        setMessage(error.message)
+        if (error.code === 'slot_taken' || error.code === 'slot_unavailable') {
+          const day = slotDay(slot)
+          const fresh = await api.GET('/api/meeting-types/{id}/slots', {
+            params: { path: { id: meetingType.id } },
+          })
+          setDaySlots(fresh.data?.filter((candidate) => slotDay(candidate) === day) ?? [])
+          onSlot(null)
+        }
+      }
+    } catch {
       setFields({})
-      setMessage(error.message)
+      setMessage('Не удалось отправить запрос. Попробуйте ещё раз')
     }
+    setSubmitting(false)
   }
 
   return (
     <Stack mt="md">
-      <Text>
-        {meetingType.name}: {slotRange(slot)}
-      </Text>
-      {message && <Alert color="red">{message}</Alert>}
+      {slot && (
+        <Text>
+          {meetingType.name}: {slotRange(slot)}
+        </Text>
+      )}
+      {message && (
+        <Alert color="red">
+          {message}
+          {!slot && daySlots && (
+            <SimpleGrid cols={4} spacing="xs" mt="xs">
+              {daySlots.map((candidate) => (
+                <Button key={candidate.start} variant="default" onClick={() => onSlot(candidate)}>
+                  {slotTime(candidate)}
+                </Button>
+              ))}
+            </SimpleGrid>
+          )}
+        </Alert>
+      )}
       <TextInput
         label="Имя"
         required
@@ -198,7 +230,7 @@ function DataStep({
         <Button variant="default" onClick={onBack}>
           Назад
         </Button>
-        <Button loading={submitting} onClick={submit}>
+        <Button loading={submitting} disabled={!slot} onClick={submit}>
           Записаться
         </Button>
       </Group>
@@ -270,10 +302,11 @@ function Wizard({ id, owner }: { id?: string; owner?: Owner }) {
         )}
       </Stepper.Step>
       <Stepper.Step label="Данные">
-        {meetingType && slot && (
+        {meetingType && onData && (
           <DataStep
             meetingType={meetingType}
             slot={slot}
+            onSlot={setSlot}
             onBack={() => setOnData(false)}
             onBooked={setMeeting}
           />
