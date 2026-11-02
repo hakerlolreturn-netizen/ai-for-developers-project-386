@@ -24,3 +24,58 @@ interface OwnerApi {
   @get
   getOwner(): Owner | ApiError;
 }
+
+model MeetingType {
+  @pattern("^[a-z0-9]+(-[a-z0-9]+)*$")
+  @minLength(1)
+  @maxLength(50)
+  id: string;
+
+  name: string;
+  description: string;
+  durationMinutes: 15 | 30 | 45 | 60;
+}
+
+model CreateMeetingType {
+  @pattern("^[a-z0-9]+(-[a-z0-9]+)*$")
+  @minLength(1)
+  @maxLength(50)
+  id: string;
+
+  @pattern("\\S")
+  @maxLength(100)
+  name: string;
+
+  @maxLength(500)
+  description?: string;
+
+  durationMinutes: 15 | 30 | 45 | 60;
+}
+
+@error
+model ValidationError {
+  @statusCode _: 400;
+  code: "validation_error";
+  message: string;
+  fields: Record<string>;
+}
+
+@error
+model MeetingTypeIdTaken {
+  @statusCode _: 409;
+  code: "meeting_type_id_taken";
+  message: string;
+}
+
+@route("/api/meeting-types")
+@tag("meeting-types")
+interface MeetingTypesApi {
+  @get
+  listMeetingTypes(): MeetingType[];
+
+  @post
+  createMeetingType(@body body: CreateMeetingType): {
+    @statusCode _: 201;
+    @body body: MeetingType;
+  } | ValidationError | MeetingTypeIdTaken;
+}
