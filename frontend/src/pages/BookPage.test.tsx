@@ -1,4 +1,5 @@
 import { MantineProvider } from '@mantine/core'
+import dayjs from 'dayjs'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
@@ -7,10 +8,14 @@ import App from '../App.tsx'
 
 type Stored = { id: string; name: string; description: string; durationMinutes: number }
 
+type Slot = { start: string; end: string }
+
 let stored: Stored[]
+let slots: Slot[]
 
 beforeEach(() => {
   stored = []
+  slots = []
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: Request) => {
@@ -19,6 +24,7 @@ beforeEach(() => {
         return Response.json({ name: 'Владелец календаря', timeZone: 'Europe/Moscow' })
       }
       if (pathname === '/api/meeting-types') return Response.json(stored)
+      if (pathname.endsWith('/slots')) return Response.json(slots)
       const found = stored.find(
         (meetingType) => pathname === `/api/meeting-types/${meetingType.id}`,
       )
@@ -91,6 +97,79 @@ describe('шаг «Тип встречи»', () => {
 
     expect(await screen.findByText('Такого типа встречи нет')).toBeTruthy()
     await userEvent.click(screen.getByRole('link', { name: 'К списку типов встреч' }))
+
+    expect(await screen.findByRole('link', { name: /Знакомство/ })).toBeTruthy()
+  })
+})
+
+describe('шаг «Время»', () => {
+  const moscowToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(
+    new Date(),
+  )
+  const day = (offset: number) => dayjs(moscowToday).add(offset, 'day')
+  const slotAt = (offset: number, time: string): Slot => ({
+    start: `${day(offset).format('YYYY-MM-DD')}T${time}:00+03:00`,
+    end: `${day(offset).format('YYYY-MM-DD')}T${time}:00+03:00`,
+  })
+  const dayButton = (offset: number) =>
+    screen.getByRole('button', { name: day(offset).format('D MMMM YYYY') }) as HTMLButtonElement
+
+  beforeEach(() => {
+    stored.push({ id: 'intro', name: 'Знакомство', description: '', durationMinutes: 30 })
+    slots = [slotAt(1, '09:00'), slotAt(1, '09:15'), slotAt(3, '14:30')]
+  })
+
+  it('выключает дни без слотов и дни вне окна записи', async () => {
+    renderAt('/book/intro')
+    await screen.findByText('Знакомство, 30 мин')
+    await screen.findByRole('button', { name: day(1).format('D MMMM YYYY') })
+
+    expect(dayButton(1).disabled).toBe(false)
+    expect(dayButton(3).disabled).toBe(false)
+    expect(dayButton(2).disabled).toBe(true)
+    expect(dayButton(0).disabled).toBe(true)
+    expect(dayButton(14).disabled).toBe(true)
+  })
+
+  it('после выбора дня показывает кнопки со временем начала слотов этого дня', async () => {
+    renderAt('/book/intro')
+
+    await userEvent.click(await screen.findByRole('button', { name: day(1).format('D MMMM YYYY') }))
+
+    expect(screen.getByRole('button', { name: '09:00' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '09:15' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '14:30' })).toBeNull()
+  })
+
+  it('«Далее» активна только после выбора слота', async () => {
+    renderAt('/book/intro')
+    await userEvent.click(await screen.findByRole('button', { name: day(1).format('D MMMM YYYY') }))
+    const next = screen.getByRole('button', { name: 'Далее' }) as HTMLButtonElement
+    expect(next.disabled).toBe(true)
+
+    await userEvent.click(screen.getByRole('button', { name: '09:15' }))
+
+    expect(next.disabled).toBe(false)
+  })
+
+  it('«Далее» ведёт на шаг «Данные», «Назад» возвращает на «Время» с выбранным слотом', async () => {
+    renderAt('/book/intro')
+    await userEvent.click(await screen.findByRole('button', { name: day(1).format('D MMMM YYYY') }))
+    await userEvent.click(screen.getByRole('button', { name: '09:15' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Далее' }))
+
+    expect(screen.queryByRole('button', { name: '09:15' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: /Время/ }))
+    expect(
+      ((await screen.findByRole('button', { name: 'Далее' })) as HTMLButtonElement).disabled,
+    ).toBe(false)
+  })
+
+  it('«Назад» на шаге «Время» возвращает к списку типов встреч', async () => {
+    renderAt('/book/intro')
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Назад' }))
 
     expect(await screen.findByRole('link', { name: /Знакомство/ })).toBeTruthy()
   })

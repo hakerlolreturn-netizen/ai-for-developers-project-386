@@ -74,6 +74,11 @@ model MeetingTypeNotFound {
   message: string;
 }
 
+model Slot {
+  start: utcDateTime;
+  end: utcDateTime;
+}
+
 @route("/api/meeting-types")
 @tag("meeting-types")
 interface MeetingTypesApi {
@@ -83,6 +88,10 @@ interface MeetingTypesApi {
   @get
   @route("{id}")
   getMeetingType(@path id: string): MeetingType | MeetingTypeNotFound;
+
+  @get
+  @route("{id}/slots")
+  listSlots(@path id: string): Slot[] | MeetingTypeNotFound;
 
   @post
   createMeetingType(@body body: CreateMeetingType): {
