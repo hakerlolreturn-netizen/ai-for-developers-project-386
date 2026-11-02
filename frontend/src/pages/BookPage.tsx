@@ -138,7 +138,7 @@ function TimeStep({
 }
 
 const slotRange = (slot: Slot, timeZone: string) =>
-  `${inZone(slot.start, timeZone).format('D MMMM')}, ${slotTime(slot, timeZone)}–${slotTime({ start: slot.end }, timeZone)}`
+  `${inZone(slot.start, timeZone).format('D MMMM')}, ${slotTime(slot, timeZone)}–${inZone(slot.end, timeZone).format('HH:mm')}`
 
 function DataStep({
   meetingType,
