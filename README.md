@@ -43,6 +43,8 @@ docker run -e PORT=8080 -p 8080:8080 calendar   # http://localhost:8080
 
 ## Деплой
 
+Сервис развёрнут на Render: https://ai-for-developers-project-386-7qil.onrender.com
+
 Данные (типы встреч и записи) хранятся в памяти процесса и сбрасываются при каждом перезапуске: после деплоя, рестарта и засыпания бесплатного инстанса Render без трафика.
 
 ### Render MCP
